@@ -1,0 +1,42 @@
+@baseUrl = http://localhost:3000/api
+
+### ===============================
+### UsersController
+### ===============================
+POST {{baseUrl}}/users
+Content-Type: application/json
+{
+  "name": "Perla Rubi",
+  "email": "perla@gmail.com",
+  "password": "123456"
+}
+
+GET {{baseUrl}}/users
+
+GET {{baseUrl}}/users/1
+
+PUT {{baseUrl}}/users/1
+Content-Type: application/json
+{
+  "name": "Perla Actualizada",
+  "email": "perla_new@example.com"
+}
+
+DELETE {{baseUrl}}/users/1
+
+
+### ===============================
+### AuthController
+### ===============================
+
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+{
+  "email": "perla_new@example.com",
+  "password": "123456"
+}
+
+@token = TU_TOKEN_AQUI
+
+GET {{baseUrl}}/users
+Authorization: Bearer {{token}}
