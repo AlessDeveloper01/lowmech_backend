@@ -37,6 +37,10 @@ export class Cliente {
   @Column({ type: 'boolean', default: false })
   passwordSet: boolean;
 
+  /** Better Auth user id (linked automatically on sign-up) */
+  @Column('varchar', { length: 100, nullable: true, unique: true })
+  betterAuthUserId: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

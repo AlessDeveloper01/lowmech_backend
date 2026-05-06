@@ -1,13 +1,13 @@
 import {
   Injectable,
   UnauthorizedException,
-  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service.js';
 import { ClientesService } from '../clientes/clientes.service.js';
 import { LoginDto } from './dto/login.dto.js';
+import { Cliente } from '../clientes/entities/cliente.entity.js';
 
 @Injectable()
 export class AuthService {
@@ -51,49 +51,7 @@ export class AuthService {
     };
   }
 
-  // ─── Portal de clientes ──────────────────────────────────────────────────
-
-  /** Paso 1: verificar si el email existe y si ya tiene contraseña */
-  async clienteCheck(email: string): Promise<{ needsPassword: boolean }> {
-    const cliente = await this.clientesService.findByEmail(email);
-    if (!cliente) {
-      throw new UnauthorizedException(
-        'El correo no está registrado como cliente',
-      );
-    }
-    return { needsPassword: !cliente.passwordSet };
-  }
-
-  /** Paso 2a (primer acceso): establecer contraseña y devolver JWT */
-  async clienteSetPassword(email: string, password: string) {
-    const cliente = await this.clientesService.findByEmail(email);
-    if (!cliente) throw new UnauthorizedException('Cliente no encontrado');
-    if (cliente.passwordSet) {
-      throw new BadRequestException(
-        'Este cliente ya tiene contraseña establecida',
-      );
-    }
-
-    const hash = await bcrypt.hash(password, 10);
-    await this.clientesService.setPassword(cliente.id, hash);
-
-    return this.buildClienteToken({ ...cliente, passwordSet: true });
-  }
-
-  /** Paso 2b (accesos siguientes): login con email + contraseña */
-  async clienteLogin(email: string, password: string) {
-    const cliente = await this.clientesService.findByEmail(email);
-    if (!cliente || !cliente.passwordSet || !cliente.password) {
-      throw new UnauthorizedException('Credenciales inválidas');
-    }
-
-    const valid = await bcrypt.compare(password, cliente.password);
-    if (!valid) throw new UnauthorizedException('Credenciales inválidas');
-
-    return this.buildClienteToken(cliente);
-  }
-
-  private buildClienteToken(cliente: any) {
+  buildClienteToken(cliente: Cliente) {
     const payload = {
       sub: cliente.id,
       username: cliente.email,

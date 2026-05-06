@@ -16,6 +16,7 @@ import { PromocionesModule } from './promociones/promociones.module.js';
 import { OrdenesModule } from './ordenes/ordenes.module.js';
 import { ConfiguracionModule } from './configuracion/configuracion.module.js';
 import { Configuracion } from './configuracion/entities/configuracion.entity.js';
+import { BetterAuthModule } from './better-auth/better-auth.module.js';
 import { User } from './users/entities/user.entity.js';
 import { Cliente } from './clientes/entities/cliente.entity.js';
 import { Vehiculo } from './vehiculos/entities/vehiculo.entity.js';
@@ -58,6 +59,7 @@ import { OrdenLinea } from './ordenes/entities/orden-linea.entity.js';
     OrdenesModule,
     PagosModule,
     ConfiguracionModule,
+    BetterAuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],

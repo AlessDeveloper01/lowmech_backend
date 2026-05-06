@@ -6,12 +6,14 @@ import { AuthController } from './auth.controller.js';
 import { JwtStrategy } from './strategies/jwt.strategy.js';
 import { UsersModule } from '../users/users.module.js';
 import { ClientesModule } from '../clientes/clientes.module.js';
+import { BetterAuthModule } from '../better-auth/better-auth.module.js';
 import { JWT_SECRET } from './constants.js';
 
 @Module({
   imports: [
     UsersModule,
     ClientesModule,
+    BetterAuthModule,
     PassportModule,
     JwtModule.register({
       secret: JWT_SECRET,

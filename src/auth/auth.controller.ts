@@ -1,37 +1,53 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import { Controller, Post, Body, Req, UnauthorizedException } from '@nestjs/common';
 import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
+import { BetterAuthService } from '../better-auth/better-auth.service.js';
+import { ClientesService } from '../clientes/clientes.service.js';
+import type { Request } from 'express';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly betterAuthService: BetterAuthService,
+    private readonly clientesService: ClientesService,
+  ) {}
 
   @Post('login')
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }
 
-  /** Verifica si el email existe y si ya tiene contraseña */
-  @Post('cliente/check')
-  clienteCheck(@Body('email') email: string) {
-    return this.authService.clienteCheck(email);
-  }
+  /** Intercambia sesión Better Auth por JWT interno de cliente */
+  @Post('cliente/exchange')
+  async clienteExchange(@Req() req: Request) {
+    const headers = new Headers();
+    for (const [key, value] of Object.entries(req.headers)) {
+      if (typeof value === 'string') {
+        headers.set(key, value);
+      } else if (Array.isArray(value)) {
+        value.forEach((v) => headers.append(key, v));
+      }
+    }
+    const session = await this.betterAuthService.auth.api.getSession({ headers });
+    if (!session) {
+      throw new UnauthorizedException('Sesión no válida');
+    }
 
-  /** Primer acceso: establece contraseña y devuelve JWT */
-  @Post('cliente/set-password')
-  clienteSetPassword(
-    @Body('email') email: string,
-    @Body('password') password: string,
-  ) {
-    return this.authService.clienteSetPassword(email, password);
-  }
+    let cliente = await this.clientesService.findByEmail(session.user.email);
+    if (!cliente) {
+      cliente = await this.clientesService.create({
+        nombre: session.user.name || session.user.email.split('@')[0],
+        email: session.user.email,
+        telefono: '',
+        betterAuthUserId: session.user.id,
+      } as any);
+    } else if (!cliente.betterAuthUserId) {
+      await this.clientesService.update(cliente.id, {
+        betterAuthUserId: session.user.id,
+      } as any);
+    }
 
-  /** Login normal con email + contraseña */
-  @Post('cliente/login')
-  clienteLogin(
-    @Body('email') email: string,
-    @Body('password') password: string,
-  ) {
-    return this.authService.clienteLogin(email, password);
+    return this.authService.buildClienteToken(cliente);
   }
 }
