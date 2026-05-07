@@ -4,15 +4,24 @@ import { Repository } from 'typeorm';
 import { Vehiculo } from './entities/vehiculo.entity.js';
 import { CreateVehiculoDto } from './dto/create-vehiculo.dto.js';
 import { UpdateVehiculoDto } from './dto/update-vehiculo.dto.js';
+import { CloudinaryService } from '../cloudinary/cloudinary.service.js';
 
 @Injectable()
 export class VehiculosService {
   constructor(
     @InjectRepository(Vehiculo)
     private readonly vehiculosRepo: Repository<Vehiculo>,
+    private readonly cloudinary: CloudinaryService,
   ) {}
 
+  private isBase64(str: string): boolean {
+    return str.startsWith('data:image');
+  }
+
   async create(dto: CreateVehiculoDto): Promise<Vehiculo> {
+    if (dto.imagenUrl && this.isBase64(dto.imagenUrl)) {
+      dto.imagenUrl = await this.cloudinary.uploadBase64(dto.imagenUrl, 'vehiculos');
+    }
     const vehiculo = this.vehiculosRepo.create(dto);
     return this.vehiculosRepo.save(vehiculo);
   }
@@ -40,6 +49,10 @@ export class VehiculosService {
     const vehiculo = await this.vehiculosRepo.findOne({ where: { id } });
     if (!vehiculo) {
       throw new NotFoundException(`Vehiculo con id ${id} no encontrado`);
+    }
+    if (dto.imagenUrl && this.isBase64(dto.imagenUrl)) {
+      if (vehiculo.imagenUrl) await this.cloudinary.deleteImage(vehiculo.imagenUrl);
+      dto.imagenUrl = await this.cloudinary.uploadBase64(dto.imagenUrl, 'vehiculos');
     }
     Object.assign(vehiculo, dto);
     return this.vehiculosRepo.save(vehiculo);

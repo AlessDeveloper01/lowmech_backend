@@ -1,4 +1,4 @@
-import { All, Controller, Req, Res } from '@nestjs/common';
+import { All, Controller, Post, Req, Res } from '@nestjs/common';
 import { BetterAuthService } from './better-auth.service.js';
 import type { Request, Response } from 'express';
 
@@ -34,7 +34,8 @@ function convertExpressToFetchRequest(req: Request, fullUrl: string) {
       method: req.method,
       headers,
       body,
-      text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+      text: async () =>
+        typeof body === 'string' ? body : JSON.stringify(body),
       json: async () => (typeof body === 'string' ? JSON.parse(body) : body),
     };
   }
@@ -44,12 +45,45 @@ function convertExpressToFetchRequest(req: Request, fullUrl: string) {
 export class BetterAuthController {
   constructor(private readonly betterAuthService: BetterAuthService) {}
 
-  @All('*')
+  /**
+   * Endpoint principal de Better Auth para recuperación de contraseña.
+   */
+  @Post('forget-password')
+  async forgetPassword(@Req() req: Request, @Res() res: Response) {
+    return this.dispatchToBetterAuth(
+      req,
+      res,
+      '/api/cliente-auth/request-password-reset',
+    );
+  }
+
+  /**
+   * Alias de compatibilidad para clientes que envían "forgot-password".
+   */
+  @Post('forgot-password')
+  async forgotPasswordAlias(@Req() req: Request, @Res() res: Response) {
+    return this.dispatchToBetterAuth(
+      req,
+      res,
+      '/api/cliente-auth/request-password-reset',
+    );
+  }
+
+  @All('*path')
   async handle(@Req() req: Request, @Res() res: Response) {
+    return this.dispatchToBetterAuth(req, res);
+  }
+
+  private async dispatchToBetterAuth(
+    req: Request,
+    res: Response,
+    overrideUrl?: string,
+  ) {
     try {
       const host = req.get('host') || 'localhost:3000';
       const protocol = req.protocol || 'http';
-      const fullUrl = `${protocol}://${host}${req.originalUrl || req.url}`;
+      const finalPath = overrideUrl ?? req.originalUrl ?? req.url;
+      const fullUrl = `${protocol}://${host}${finalPath}`;
 
       console.log('Better Auth Request:', {
         method: req.method,
@@ -61,10 +95,14 @@ export class BetterAuthController {
       const fetchRequest = convertExpressToFetchRequest(req, fullUrl);
 
       // Better Auth retorna una Fetch API Response
-      const response = await this.betterAuthService.auth.handler(fetchRequest as any);
+      const response = await this.betterAuthService.auth.handler(
+        fetchRequest as any,
+      );
 
       if (!response) {
-        return res.status(500).json({ error: 'No response from Better Auth handler' });
+        return res
+          .status(500)
+          .json({ error: 'No response from Better Auth handler' });
       }
 
       // Convertir Fetch Response a Express Response
@@ -82,7 +120,7 @@ export class BetterAuthController {
       const body = await response.text();
 
       res.status(status);
-      
+
       // Si es un redirect (3xx), manejar redirect
       if (status >= 300 && status < 400) {
         let location = headers.get('location');
@@ -92,12 +130,12 @@ export class BetterAuthController {
           originalUrl: req.originalUrl,
           path: req.path,
         });
-        
+
         // Para otros redirects, hacer el redirect HTTP normal
         if (location && !location.startsWith('http')) {
           location = `${protocol}://${host}${location}`;
         }
-        
+
         if (location) {
           console.log('Final redirect to:', location);
           return res.redirect(status, location);

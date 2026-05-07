@@ -38,6 +38,12 @@ export class User {
   @Column({ default: true })
   activo: boolean;
 
+  @Column('varchar', { length: 100, nullable: true })
+  resetToken: string | null;
+
+  @Column('datetime', { nullable: true })
+  resetTokenExpires: Date | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

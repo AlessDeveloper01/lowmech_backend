@@ -68,4 +68,8 @@ export class UpdateVehiculoDto {
   @IsString()
   @IsOptional()
   notas?: string;
+
+  @IsString()
+  @IsOptional()
+  imagenUrl?: string;
 }

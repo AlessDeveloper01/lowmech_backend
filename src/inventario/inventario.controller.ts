@@ -14,11 +14,21 @@ import { InventarioService } from './inventario.service.js';
 import { CreateArticuloDto } from './dto/create-articulo.dto.js';
 import { UpdateArticuloDto } from './dto/update-articulo.dto.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { CloudinaryService } from '../cloudinary/cloudinary.service.js';
 
 @Controller('inventario')
 @UseGuards(JwtAuthGuard)
 export class InventarioController {
-  constructor(private readonly inventarioService: InventarioService) {}
+  constructor(
+    private readonly inventarioService: InventarioService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
+
+  @Post('upload')
+  async uploadImagen(@Body('imagen') imagen: string) {
+    const url = await this.cloudinary.uploadBase64(imagen, 'inventario');
+    return { url };
+  }
 
   @Post()
   create(@Body() dto: CreateArticuloDto) {

@@ -9,16 +9,63 @@ import {
   ParseIntPipe,
   UseGuards,
   Request,
+  BadRequestException,
+  UnauthorizedException,
 } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OrdenesService } from './ordenes.service';
 import { CreateOrdenDto } from './dto/create-orden.dto';
 import { UpdateOrdenDto } from './dto/update-orden.dto';
+import { CloudinaryService } from '../cloudinary/cloudinary.service.js';
+import { BetterAuthService } from '../better-auth/index';
 
 @UseGuards(JwtAuthGuard)
 @Controller('ordenes')
 export class OrdenesController {
-  constructor(private readonly svc: OrdenesService) {}
+  constructor(
+    private readonly svc: OrdenesService,
+    private readonly cloudinary: CloudinaryService,
+    private readonly jwtService: JwtService,
+    private readonly betterAuthService: BetterAuthService,
+  ) {}
+
+  @Post('upload')
+  async uploadImagen(@Request() req: any, @Body('imagen') imagen: string) {
+    // Verificar autenticación (JWT o Better Auth)
+    const authHeader = req.headers.authorization;
+    let autenticado = false;
+    if (authHeader?.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      try {
+        this.jwtService.verify(token);
+        autenticado = true;
+      } catch {
+        // JWT inválido
+      }
+    }
+    if (!autenticado) {
+      try {
+        const session = await this.betterAuthService.auth.api.getSession(req);
+        if (session && session.user) autenticado = true;
+      } catch {
+        // Better Auth falló
+      }
+    }
+    if (!autenticado) {
+      throw new UnauthorizedException('No autorizado');
+    }
+
+    try {
+      if (!imagen || !imagen.startsWith('data:image')) {
+        throw new Error('Formato de imagen inválido. Debe ser una imagen en base64.');
+      }
+      const url = await this.cloudinary.uploadBase64(imagen, 'ordenes');
+      return { url };
+    } catch (error: any) {
+      throw new BadRequestException(error.message || 'Error al subir la imagen a Cloudinary');
+    }
+  }
 
   @Post()
   create(@Body() dto: CreateOrdenDto) {
@@ -55,9 +102,9 @@ export class OrdenesController {
   @Put(':id/estado')
   cambiarEstado(
     @Param('id', ParseIntPipe) id: number,
-    @Body('estado') estado: string,
+    @Body() body: { estado: string; imagenUrl?: string },
   ) {
-    return this.svc.cambiarEstado(id, estado);
+    return this.svc.cambiarEstado(id, body.estado, body.imagenUrl);
   }
 
   @Put(':id/pagar-efectivo')

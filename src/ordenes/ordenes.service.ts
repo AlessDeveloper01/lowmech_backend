@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Orden } from './entities/orden.entity';
@@ -6,6 +6,7 @@ import { OrdenLinea } from './entities/orden-linea.entity';
 import { Vehiculo } from '../vehiculos/entities/vehiculo.entity';
 import { CreateOrdenDto } from './dto/create-orden.dto';
 import { UpdateOrdenDto } from './dto/update-orden.dto';
+import { CloudinaryService } from '../cloudinary/cloudinary.service.js';
 
 @Injectable()
 export class OrdenesService {
@@ -16,10 +17,18 @@ export class OrdenesService {
     private readonly lineaRepo: Repository<OrdenLinea>,
     @InjectRepository(Vehiculo)
     private readonly vehiculoRepo: Repository<Vehiculo>,
+    private readonly cloudinary: CloudinaryService,
   ) {}
+
+  private isBase64(str: string): boolean {
+    return str.startsWith('data:image');
+  }
 
   async create(dto: CreateOrdenDto) {
     const { lineas, ...rest } = dto;
+    if (rest.imagenUrl && this.isBase64(rest.imagenUrl)) {
+      rest.imagenUrl = await this.cloudinary.uploadBase64(rest.imagenUrl, 'ordenes');
+    }
     const orden = this.ordenRepo.create(rest);
     const saved = await this.ordenRepo.save(orden);
 
@@ -97,6 +106,11 @@ export class OrdenesService {
     const orden = await this.findOne(id);
     const { lineas, ...rest } = dto;
 
+    if (rest.imagenUrl && this.isBase64(rest.imagenUrl)) {
+      if (orden.imagenUrl) await this.cloudinary.deleteImage(orden.imagenUrl);
+      rest.imagenUrl = await this.cloudinary.uploadBase64(rest.imagenUrl, 'ordenes');
+    }
+
     Object.assign(orden, rest);
     await this.ordenRepo.save(orden);
 
@@ -113,11 +127,25 @@ export class OrdenesService {
     return this.findOne(id);
   }
 
-  async cambiarEstado(id: number, estado: string) {
+  async cambiarEstado(id: number, estado: string, imagenUrl?: string) {
     const orden = await this.findOne(id);
+    const estadosFinales = ['completado', 'entregado', 'finalizado'];
+
+    if (estadosFinales.includes(estado) && !imagenUrl && !orden.imagenUrl) {
+      throw new BadRequestException('Se requiere una imagen al finalizar la orden');
+    }
+
     orden.estado = estado;
-    if (estado === 'completado' || estado === 'entregado') {
+    if (estadosFinales.includes(estado)) {
       orden.fechaFin = new Date().toISOString().split('T')[0];
+    }
+    if (imagenUrl) {
+      if (this.isBase64(imagenUrl)) {
+        if (orden.imagenUrl) await this.cloudinary.deleteImage(orden.imagenUrl);
+        orden.imagenUrl = await this.cloudinary.uploadBase64(imagenUrl, 'ordenes');
+      } else {
+        orden.imagenUrl = imagenUrl;
+      }
     }
     await this.ordenRepo.save(orden);
     return this.findOne(id);

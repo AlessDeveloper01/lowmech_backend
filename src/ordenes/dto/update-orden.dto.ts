@@ -62,4 +62,8 @@ export class UpdateOrdenDto {
   @ValidateNested({ each: true })
   @Type(() => CreateOrdenLineaDto)
   lineas?: CreateOrdenLineaDto[];
+
+  @IsString()
+  @IsOptional()
+  imagenUrl?: string;
 }

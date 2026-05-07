@@ -2,6 +2,7 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -48,6 +49,30 @@ export class UsersService {
 
   async findByUsername(username: string): Promise<User | null> {
     return this.usersRepo.findOne({ where: { username } });
+  }
+
+  async findByEmail(email: string): Promise<User | null> {
+    return this.usersRepo.findOne({ where: { email } });
+  }
+
+  async setResetToken(id: number, token: string | null, expires: Date | null): Promise<void> {
+    await this.usersRepo.update(id, { resetToken: token, resetTokenExpires: expires });
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const user = await this.usersRepo.findOne({ where: { resetToken: token } });
+    if (!user) {
+      throw new NotFoundException('Token inválido');
+    }
+    if (user.resetTokenExpires && user.resetTokenExpires < new Date()) {
+      throw new UnauthorizedException('El token ha expirado');
+    }
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await this.usersRepo.update(user.id, {
+      password: hashed,
+      resetToken: null,
+      resetTokenExpires: null,
+    });
   }
 
   async update(

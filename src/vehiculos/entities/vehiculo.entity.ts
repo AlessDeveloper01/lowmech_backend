@@ -55,6 +55,9 @@ export class Vehiculo {
   @Column({ type: 'text', default: '' })
   notas: string;
 
+  @Column({ type: 'text', nullable: true })
+  imagenUrl: string | null;
+
   @CreateDateColumn()
   createdAt: Date;
 

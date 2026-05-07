@@ -109,6 +109,9 @@ export class Orden {
   @Column({ type: 'text', default: '' })
   fechaFin: string;
 
+  @Column({ type: 'text', nullable: true })
+  imagenUrl: string | null;
+
   @OneToMany(() => OrdenLinea, (l) => l.orden, { eager: true, cascade: true })
   lineas: OrdenLinea[];
 

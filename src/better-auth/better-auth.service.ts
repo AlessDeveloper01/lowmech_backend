@@ -2,15 +2,19 @@ import { Injectable, OnModuleInit } from '@nestjs/common';
 import { betterAuth } from 'better-auth';
 import Database from 'better-sqlite3';
 import { ClientesService } from '../clientes/clientes.service.js';
+import { EmailService } from '../email/email.service.js';
 
 @Injectable()
 export class BetterAuthService implements OnModuleInit {
   public readonly auth;
   private db: Database.Database;
 
-  constructor(private readonly clientesService: ClientesService) {
+  constructor(
+    private readonly clientesService: ClientesService,
+    private readonly emailService: EmailService,
+  ) {
     this.db = new Database('./lowmech.db');
-    
+
     this.auth = betterAuth({
       database: this.db,
       secret: process.env.BETTER_AUTH_SECRET || 'lowmech-secret-change-me',
@@ -26,6 +30,15 @@ export class BetterAuthService implements OnModuleInit {
       emailAndPassword: {
         enabled: true,
         autoSignIn: true,
+        sendResetPassword: async (data: any) => {
+          const url = data.url as string | undefined;
+          if (!url) return;
+          await this.emailService.sendPasswordReset(
+            data.user.email,
+            url,
+            data.user.name || data.user.email,
+          );
+        },
       },
       socialProviders: {
         google: {

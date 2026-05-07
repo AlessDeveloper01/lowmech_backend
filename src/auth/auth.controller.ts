@@ -18,6 +18,22 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
+  /** Solicita recuperación de contraseña (staff) */
+  @Post('forgot-password')
+  async forgotPassword(@Body('email') email: string) {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    return this.authService.forgotPassword(email, frontendUrl);
+  }
+
+  /** Restablece contraseña con token (staff) */
+  @Post('reset-password')
+  async resetPassword(
+    @Body('token') token: string,
+    @Body('password') password: string,
+  ) {
+    return this.authService.resetPassword(token, password);
+  }
+
   /** Intercambia sesión Better Auth por JWT interno de cliente */
   @Post('cliente/exchange')
   async clienteExchange(@Req() req: Request) {

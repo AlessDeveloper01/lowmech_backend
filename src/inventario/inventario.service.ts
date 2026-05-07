@@ -8,13 +8,19 @@ import { Repository } from 'typeorm';
 import { Articulo } from './entities/articulo.entity.js';
 import { CreateArticuloDto } from './dto/create-articulo.dto.js';
 import { UpdateArticuloDto } from './dto/update-articulo.dto.js';
+import { CloudinaryService } from '../cloudinary/cloudinary.service.js';
 
 @Injectable()
 export class InventarioService {
   constructor(
     @InjectRepository(Articulo)
     private readonly articulosRepo: Repository<Articulo>,
+    private readonly cloudinary: CloudinaryService,
   ) {}
+
+  private isBase64(str: string): boolean {
+    return str.startsWith('data:image');
+  }
 
   async create(dto: CreateArticuloDto): Promise<Articulo> {
     const exists = await this.articulosRepo.findOne({
@@ -22,6 +28,9 @@ export class InventarioService {
     });
     if (exists) {
       throw new ConflictException('Ya existe un artículo con ese SKU');
+    }
+    if (dto.imagenUrl && this.isBase64(dto.imagenUrl)) {
+      dto.imagenUrl = await this.cloudinary.uploadBase64(dto.imagenUrl, 'inventario');
     }
     const articulo = this.articulosRepo.create(dto);
     return this.articulosRepo.save(articulo);
@@ -52,6 +61,11 @@ export class InventarioService {
       if (duplicate) {
         throw new ConflictException('Ya existe un artículo con ese SKU');
       }
+    }
+
+    if (dto.imagenUrl && this.isBase64(dto.imagenUrl)) {
+      if (articulo.imagenUrl) await this.cloudinary.deleteImage(articulo.imagenUrl);
+      dto.imagenUrl = await this.cloudinary.uploadBase64(dto.imagenUrl, 'inventario');
     }
 
     Object.assign(articulo, dto);

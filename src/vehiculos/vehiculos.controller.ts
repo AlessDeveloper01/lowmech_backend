@@ -14,11 +14,21 @@ import { VehiculosService } from './vehiculos.service.js';
 import { CreateVehiculoDto } from './dto/create-vehiculo.dto.js';
 import { UpdateVehiculoDto } from './dto/update-vehiculo.dto.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { CloudinaryService } from '../cloudinary/cloudinary.service.js';
 
 @Controller('vehiculos')
 @UseGuards(JwtAuthGuard)
 export class VehiculosController {
-  constructor(private readonly vehiculosService: VehiculosService) {}
+  constructor(
+    private readonly vehiculosService: VehiculosService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
+
+  @Post('upload')
+  async uploadImagen(@Body('imagen') imagen: string) {
+    const url = await this.cloudinary.uploadBase64(imagen, 'vehiculos');
+    return { url };
+  }
 
   @Post()
   create(@Body() dto: CreateVehiculoDto) {
