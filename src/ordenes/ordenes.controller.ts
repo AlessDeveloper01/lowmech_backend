@@ -77,6 +77,11 @@ export class OrdenesController {
     return this.svc.findAll();
   }
 
+  @Get('con-evidencia')
+  findConEvidencia() {
+    return this.svc.findConEvidencia();
+  }
+
   /** Endpoint para clientes: devuelve solo sus ordenes */
   @Get('mis-ordenes')
   misOrdenes(@Request() req: any) {

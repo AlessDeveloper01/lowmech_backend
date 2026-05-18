@@ -14,6 +14,7 @@ import { Orden } from '../ordenes/entities/orden.entity';
 import { OrdenLinea } from '../ordenes/entities/orden-linea.entity';
 import { CrearIntentDto } from './dto/crear-intent.dto';
 import { ConfirmarPagoDto } from './dto/confirmar-pago.dto';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class PagosService {
@@ -23,6 +24,7 @@ export class PagosService {
 
   constructor(
     private readonly config: ConfigService,
+    private readonly emailService: EmailService,
     @InjectRepository(Pago) private readonly pagoRepo: Repository<Pago>,
     @InjectRepository(Orden) private readonly ordenRepo: Repository<Orden>,
     @InjectRepository(OrdenLinea)
@@ -224,7 +226,65 @@ export class PagosService {
       relations: ['cliente', 'vehiculo', 'mecanico', 'promocion', 'lineas'],
     });
 
+    // Enviar email de confirmacion de pago (fire-and-forget, no bloquea la respuesta)
+    if (ordenCompleta) {
+      this.enviarEmailPago(ordenCompleta, pago).catch((e) =>
+        this.logger.error('Error enviando email de pago:', e),
+      );
+    }
+
     return { orden: ordenCompleta, pago };
+  }
+
+  /**
+   * Envia email de confirmacion de pago al cliente.
+   * Fire-and-forget: no bloquea la respuesta del endpoint.
+   */
+  private async enviarEmailPago(orden: Orden, pago: Pago) {
+    if (!orden.cliente?.email) {
+      this.logger.warn(`Orden #${orden.id} sin email de cliente, omitiendo envio`);
+      return;
+    }
+
+    const subtotal = orden.lineas.reduce(
+      (sum, l) => sum + l.cantidad * l.precioUnitario,
+      0,
+    );
+    const iva = subtotal * 0.16;
+    const total = subtotal + iva;
+
+    const vehiculoInfo = orden.vehiculo
+      ? `${orden.vehiculo.marca} ${orden.vehiculo.modelo} ${orden.vehiculo.anio ?? ''}`.trim()
+      : 'No especificado';
+
+    const cardInfo = pago.brand && pago.last4 ? `${pago.brand} •••• ${pago.last4}` : undefined;
+
+    const fechaFormateada = new Date(pago.createdAt).toLocaleDateString('es-MX', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    await this.emailService.sendPaymentConfirmation(orden.cliente.email, {
+      ordenId: orden.id,
+      clienteNombre: orden.cliente.nombre,
+      vehiculoInfo,
+      diagnostico: orden.diagnostico,
+      monto: pago.monto,
+      metodo: pago.metodo,
+      cardInfo,
+      fecha: fechaFormateada,
+      lineas: orden.lineas.map((l) => ({
+        descripcion: l.descripcion,
+        cantidad: l.cantidad,
+        precioUnitario: l.precioUnitario,
+      })),
+      subtotal,
+      iva,
+      total,
+    });
   }
 
   async findPagoByOrden(ordenId: number) {
@@ -235,6 +295,9 @@ export class PagosService {
   }
 
   async findAll() {
-    return this.pagoRepo.find({ order: { createdAt: 'DESC' } });
+    return this.pagoRepo.find({
+      relations: ['orden', 'orden.cliente', 'orden.vehiculo', 'orden.mecanico'],
+      order: { createdAt: 'DESC' },
+    });
   }
 }
